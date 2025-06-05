@@ -25,7 +25,7 @@ class Event(BaseModel):
     __tablename__ = "events"
 
     type = Column(String) # тип события
-    creator = Column(Integer) # ID автора
+    creator = Column(Integer) # телеграмм ID автора
     title = Column(String) # название
     created_timestamp = Column(DateTime, default=datetime.now(timezone('Europe/Moscow'))) # время создания события
     start_time = Column(DateTime) # время начала события
