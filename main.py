@@ -1,5 +1,7 @@
 import telebot
 from telebot import types
+from datetime import datetime
+from  pytz import timezone
 from database import Session
 from models import User, Event
 from keys import tg_token as token
@@ -48,6 +50,16 @@ def show_info(message):
     with Session() as db:
         user = db.query(User).filter(User.tg_id == message.chat.id).first()
     bot.send_message(message.chat.id, f"Вас зовут: {user.last_name} {user.first_name[0]}. {user.middle_name[0]}.\nГруппа: {user.group}")
+
+@bot.message_handler(commands=["active_events"])
+def show_active_events(message):
+    with Session() as db:
+        events = list(db.query(Event).filter(Event.start_time >= datetime.now(timezone('Europe/Moscow'))))
+        if len(events) == 0:
+            bot.send_message(message.chat.id, "На данный момент нет активных событий")
+        else:
+            for event in events:
+                bot.send_message(message.chat.id, f"Тип: {event.type}\nНазвание: {event.title}")
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
