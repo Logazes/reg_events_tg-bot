@@ -19,7 +19,7 @@ class User(BaseModel):
     middle_name = Column(String) # отчество
     last_name = Column(String) # фамилия
     group = Column(String) # группа
-    admin = Column(Boolean) # является ли админом
+    admin = Column(Boolean, default=False) # является ли админом
 
 class Event(BaseModel):
     __tablename__ = "events"

@@ -2,3 +2,4 @@
 __pycache__
 metanit.db
 .handler-saves
+keys.py

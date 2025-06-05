@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 from database import Session
 from models import User, Event
-token = '7617704331:AAG0-vPN4S3bxawZH8T6jgP28Lw0mEUy8-I'
+from keys import tg_token as token
 bot = telebot.TeleBot(token)
 
 @bot.message_handler(commands=['start'])
@@ -42,6 +42,12 @@ def add_group(message):
         db.query(User).filter(User.tg_id == message.chat.id).first().group = message.text.replace(' ', '')
         db.commit()
     bot.send_message(message.chat.id, "вы зарегистрированы")
+
+@bot.message_handler(commands=['info'])
+def show_info(message):
+    with Session() as db:
+        user = db.query(User).filter(User.tg_id == message.chat.id).first()
+    bot.send_message(message.chat.id, f"Вас зовут: {user.last_name} {user.first_name[0]}. {user.middle_name[0]}.\nГруппа: {user.group}")
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
