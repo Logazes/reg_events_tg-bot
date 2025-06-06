@@ -1,9 +1,10 @@
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from datetime import datetime
 from  pytz import timezone
 from database import Session
 from models import User, Event, Registration
+from utils import export_registered_users
 from keys import tg_token as token
 bot = telebot.TeleBot(token)
 
@@ -61,7 +62,9 @@ def show_active_events(message):
         else:
             for event in events:
                 markup = InlineKeyboardMarkup()
-                print(f"event_{message.chat.id}_{event.id}")
+                if db.query(User).filter(User.tg_id == message.chat.id).first().admin:
+                    markup.add(InlineKeyboardButton("Показать участников", callback_data=f"display_{message.chat.id}_{event.id}"))
+                    markup.add(InlineKeyboardButton("Экспорт участников", callback_data=f"export_{message.chat.id}_{event.id}"))
                 markup.add(InlineKeyboardButton("Принять участие", callback_data=f"event_{message.chat.id}_{event.id}"))
                 bot.send_message(message.chat.id, f"Тип: {event.type}\nНазвание: {event.title}\nДата и время проведения: {event.start_time}", reply_markup=markup)
 
@@ -116,9 +119,27 @@ def callback_query(call):
             if not db.query(Registration).filter((Registration.user == data[1]) & (Registration.event == data[2])).first():
                 db.add(Registration(user=data[1], event= data[2]))
                 db.commit()
-                bot.answer_callback_query(call.id, "Вы зарегистрированы")
+                bot.answer_callback_query(call.id, "Вы записаны на событие")
             else:
-                bot.answer_callback_query(call.id, f"Вы уже зарегистрированы")
+                bot.answer_callback_query(call.id, f"Вы уже записаны на событие")
+    elif data[0] == "display":
+        with Session() as db:
+            users_ids = [i.user for i in db.query(Registration).filter(Registration.event == int(data[2]))]
+            users = list()
+            for id in users_ids:
+                user = db.query(User).filter(User.tg_id == id).first()
+                users.append(f"{user.last_name} {user.first_name[0]}. {user.middle_name[0]}. {user.group}")
+            bot.send_message(data[1], '\n'.join(users))
+    elif data[0] == "export":
+        file = export_registered_users(data[2])
+        with open(file, 'rb') as f:
+            bot.send_document(
+                data[1],
+                InputFile(f, file_name= file)
+                
+            )
+            
+            
 
 bot.enable_save_next_step_handlers(delay=2)
 bot.load_next_step_handlers()
