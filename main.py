@@ -1,10 +1,9 @@
 import telebot
-from telebot import types
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 from  pytz import timezone
 from database import Session
-from models import User, Event
-from utils import is_admin
+from models import User, Event, Registration
 from keys import tg_token as token
 bot = telebot.TeleBot(token)
 
@@ -61,15 +60,19 @@ def show_active_events(message):
             bot.send_message(message.chat.id, "На данный момент нет активных событий")
         else:
             for event in events:
-                bot.send_message(message.chat.id, f"Тип: {event.type}\nНазвание: {event.title}")
+                markup = InlineKeyboardMarkup()
+                print(f"event_{message.chat.id}_{event.id}")
+                markup.add(InlineKeyboardButton("Принять участие", callback_data=f"event_{message.chat.id}_{event.id}"))
+                bot.send_message(message.chat.id, f"Тип: {event.type}\nНазвание: {event.title}\nДата и время проведения: {event.start_time}", reply_markup=markup)
 
 @bot.message_handler(commands=["create_event"])
 def create_event(message):
-    if is_admin(message.chat.id):
-        bot.send_message(message.chat.id, "Введите название события")
-        bot.register_next_step_handler(message, add_title)
-    else: 
-        bot.send_message(message.chat.id, "Эта функция доступна только администраторам")
+    with Session() as db:
+        if db.query(User).filter(User.tg_id == message.chat.id).first.admin:
+            bot.send_message(message.chat.id, "Введите название события")
+            bot.register_next_step_handler(message, add_title)
+        else: 
+            bot.send_message(message.chat.id, "Эта функция доступна только администраторам")
 
 def add_title(message):
     with Session() as db:
@@ -82,10 +85,40 @@ def add_date(message):
     with Session() as db:
         db.query(Event).filter((Event.creator == message.chat.id) & (Event.start_time == None)).first().start_time = datetime.strptime(message.text, "%Y-%m-%d %H:%M:%S")
         db.commit()
+        bot.send_message(message.chat.id, "Событие добавлено")
+
+@bot.message_handler(commands=["create_admin"])
+def create_admin(message):
+    with Session() as db:
+        if db.query(User).filter(User.tg_id == message.chat.id).first.admin:
+            bot.send_message(message.chat.id, "Введите телеграмм ID пользователя")
+            bot.register_next_step_handler(message, add_admin_id)
+        else: 
+            bot.send_message(message.chat.id, "Эта функция доступна только администраторам")
+
+def add_admin_id(message):
+    with Session() as db:
+        tg_id = int(message.text)
+        print(tg_id)
+        db.query(User).filter(User.tg_id == tg_id).first().admin = True
+        db.commit()
+    bot.send_message(message.chat.id, "Пользователь повышен до администратора")
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
     pass
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    data = str(call.data).split('_')
+    if data[0] == 'event':
+        with Session() as db:
+            if not db.query(Registration).filter((Registration.user == data[1]) & (Registration.event == data[2])).first():
+                db.add(Registration(user=data[1], event= data[2]))
+                db.commit()
+                bot.answer_callback_query(call.id, "Вы зарегистрированы")
+            else:
+                bot.answer_callback_query(call.id, f"Вы уже зарегистрированы")
 
 bot.enable_save_next_step_handlers(delay=2)
 bot.load_next_step_handlers()

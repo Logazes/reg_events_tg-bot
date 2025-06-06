@@ -30,5 +30,11 @@ class Event(BaseModel):
     created_timestamp = Column(DateTime, default=datetime.now(timezone('Europe/Moscow'))) # время создания события
     start_time = Column(DateTime) # время начала события
 
+class Registration(BaseModel):
+    __tablename__ = "registrations"
+
+    user = Column(Integer) # телеграмм ID пользователя
+    event = Column(Integer) # ID события
+
 if __name__ == "__main__":
     Base.metadata.create_all(bind=engine)
