@@ -1,11 +1,12 @@
 from datetime import datetime
 from database import Session
 from models import User, Event, Registration
+from utils import is_admin
 from __init__ import bot
 
 def create_event(message):
     with Session() as db:
-        if db.query(User).filter(User.tg_id == message.chat.id).first().admin:
+        if is_admin(message, db):
             bot.send_message(message.chat.id, "Введите название события")
             bot.register_next_step_handler(message, add_title)
         else: 
@@ -26,7 +27,7 @@ def add_date(message):
 
 def create_admin(message):
     with Session() as db:
-        if db.query(User).filter(User.tg_id == message.chat.id).first().admin:
+        if is_admin(message, db):
             bot.send_message(message.chat.id, "Введите телеграмм ID пользователя")
             bot.register_next_step_handler(message, add_admin_id)
         else: 

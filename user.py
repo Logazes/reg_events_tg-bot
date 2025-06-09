@@ -1,7 +1,9 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from datetime import datetime
 from  pytz import timezone
+from sqlalchemy import and_
 from __init__ import bot
+from utils import is_admin
 from database import Session
 from models import User, Event, Registration
 
@@ -13,7 +15,7 @@ def start(message):
             markup = ReplyKeyboardMarkup(resize_keyboard=True)
             markup.add(KeyboardButton("Профиль"))
             markup.add(KeyboardButton("Актуальные события"))
-            if db.query(User).filter(User.tg_id == message.chat.id).first().admin:
+            if is_admin(message, db):
                 markup.add(KeyboardButton("Создать событие"))
                 markup.add(KeyboardButton("Повысить пользователя до администратора"))
             bot.send_message(message.chat.id, text="Привет", reply_markup=markup)
@@ -52,8 +54,30 @@ def add_group(message):
 
 def show_info(message):
     with Session() as db:
-        user = db.query(User).filter(User.tg_id == message.chat.id).first()
-    bot.send_message(message.chat.id, f"Вас зовут: {user.last_name} {user.first_name[0]}. {user.middle_name[0]}.\nГруппа: {user.group}")
+        query = (
+            db
+            .query(Registration, Event, User)
+            .select_from(Registration)
+            .join(
+                Event,
+                Registration.event == Event.id,
+                isouter=True)
+            .join(
+                User,
+                Registration.user == User.tg_id
+            )
+            .filter(
+                User.tg_id == message.chat.id
+            )
+        )
+        user = query[0][2]
+        text = f"""
+        {user.last_name} {user.first_name[0]}. {user.middle_name[0]}.\n
+    Группа: {user.group}\n
+    События на которые вы записаны:
+    {"\n".join([f"{event.title} {event.start_time}" for _, event, _ in query])}
+        """
+    bot.send_message(message.chat.id, text)
 
 def show_active_events(message):
     with Session() as db:

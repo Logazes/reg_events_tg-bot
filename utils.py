@@ -2,6 +2,9 @@ import pandas as pd
 from models import Registration, User, Event
 from database import Session
 
+def is_admin(message, db):
+    return db.query(User).filter(User.tg_id == message.chat.id).first().admin
+
 def export_registered_users(event_id):
     with Session() as db:
         users_ids = [i.user for i in db.query(Registration).filter(Registration.event == event_id)]
